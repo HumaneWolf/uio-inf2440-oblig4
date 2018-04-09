@@ -40,7 +40,7 @@ public class MultiRadix {
         Random rng = new Random();
 
         for (int i = 0; i < a.length; i++) {
-            a[i] = rng.nextInt();
+            a[i] = rng.nextInt(n);
         }
         int[] seqArray = a.clone();
         int[] parArray = a.clone();
