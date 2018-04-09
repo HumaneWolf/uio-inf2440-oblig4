@@ -11,6 +11,10 @@ public class MultiRadix {
     private static double[] seqTiming = new double[runs];
     private static double[] parTiming = new double[runs];
 
+    /**
+     * Main.
+     * @param args Main args.
+     */
     public static void main(String[] args) {
         if (args.length < 2) {
             System.out.println("Usage: java MultiRadix [Number of numbers to sort] [Number of threads to use]");
@@ -35,6 +39,10 @@ public class MultiRadix {
         System.out.println("\nn = " + n);
     }
 
+    /**
+     * Create a multiradix class and start tests.
+     * @param run The run id number.
+     */
     private MultiRadix(int run) {
         int[] a = new int[n];
         Random rng = new Random();
@@ -62,14 +70,43 @@ public class MultiRadix {
         testSort(parArray);
     }
 
+    /**
+     * Initialize and sort the array sequentially.
+     * @param a The array to sort.
+     */
     private void seq(int[] a) {
         //
     }
 
+    /**
+     * Initialize and sort the array in parallel.
+     * @param a The array to sort.
+     */
     private void par(int[] a) {
         //
     }
 
+    /**
+     * Find the highest value in a key range in the array.
+     * @param a The array to search.
+     * @param start The place to start. Inclusive.
+     * @param stop The place to stop. Exclusive.
+     * @return The highest number.
+     */
+    private int findMax(int[] a, int start, int stop) {
+        int max = a[start];
+        for (int i = start + 1; i < stop; i++) {
+            if (a[i] > max) {
+                max = a[i];
+            }
+        }
+        return max;
+    }
+
+    /**
+     * Test that the given array is sorted in increasing order.
+     * @param a The array to test.
+     */
     private void testSort(int[] a){
         for (int i = 0; i< a.length-1;i++) {
             if (a[i] > a[i+1]){
