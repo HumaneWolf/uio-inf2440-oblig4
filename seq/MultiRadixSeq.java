@@ -27,7 +27,7 @@ public class MultiRadixSeq {
         long tt = System.nanoTime();
 
         // 1-5 digit radixSort of : a[]
-        int max = a[0], numBit = 2, numDigits, n =a.length;
+        int max = a[0], numBit = 2, numDigits, n = a.length;
         int[] bit ;
 
         // a) finn max verdi i a[]
