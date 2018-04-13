@@ -21,7 +21,7 @@ public class MultiRadixSeq {
      * N.B. Sorterer a[] stigende – antar at: 0 ≤ a[i]) < 232
      */
     // viktig konstant
-    private final static int NUM_BIT =7; // eller 6,8,9,10..
+    private final static int NUM_BIT = 7; // eller 6,8,9,10..
 
     private void radixMulti(int[] a) {
         long tt = System.nanoTime();

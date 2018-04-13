@@ -6,6 +6,8 @@ public class MultiRadix {
     private static int n;
     private static int k;
 
+    private final static int NUM_BIT = 7;
+
     private static final int runs = 7;
     private static final int medianIndex = 4;
     private static double[] seqTiming = new double[runs];
@@ -26,6 +28,7 @@ public class MultiRadix {
 
         for (int i = 0; i < runs; i++) {
             new MultiRadix(i);
+            if (true) return;
         }
 
         Arrays.sort(seqTiming);
@@ -61,6 +64,9 @@ public class MultiRadix {
         System.out.println("Sequential time: " + seqTiming[run] + "ms.");
         testSort(seqArray);
 
+        if (true)
+            return;
+
         // Do parallel tests
         System.out.println("Starting Parallel");
         startTime = System.nanoTime();
@@ -75,7 +81,65 @@ public class MultiRadix {
      * @param a The array to sort.
      */
     private void seq(int[] a) {
-        //
+        int max = findMax(a, 0, a.length);
+
+        int numBit = 2, numDigits;
+        int[] bit;
+
+        while (max >= (1L<<numBit)) numBit++;
+
+        numDigits = Math.max(1, numBit / NUM_BIT);
+        bit = new int[numDigits];
+        int rest = numBit % NUM_BIT, sum = 0;
+
+        for (int i = 0; i < bit.length; i++){
+            bit[i] = numBit / numDigits;
+            if (rest-- > 0) {
+                bit[i]++;
+            }
+        }
+
+        int[] t, b = new int[n];
+        for (int aBit : bit) {
+            seqRadix(a, b, aBit, sum);
+            sum += aBit;
+
+            t = a;
+            a = b;
+            b = t;
+        }
+
+        if ((bit.length&1) != 0 ) {
+            System.arraycopy (a,0,b,0,a.length);
+        }
+    }
+
+    /**
+     * Sort an array from a into b sequentially.
+     * @param a The array to sort.
+     * @param b The array to store results in.
+     * @param maskLen The length of the mask, aka the size of a digit.
+     * @param shift The number of slots to shift a digit during this sorting round.
+     */
+    private void seqRadix(int[] a, int[] b, int maskLen, int shift) {
+        int acumVal = 0, j;
+        int mask = (1 << maskLen) - 1;
+
+        int[] count = new int[mask + 1];
+
+        for (int anA : a) {
+            count[(anA >> shift) & mask]++;
+        }
+
+        for (int i = 0; i <= mask; i++) {
+            j = count[i];
+            count[i] = acumVal;
+            acumVal += j;
+        }
+
+        for (int anA : a) {
+            b[count[(anA >> shift) & mask]++] = anA;
+        }
     }
 
     /**
@@ -110,8 +174,7 @@ public class MultiRadix {
     private void testSort(int[] a){
         for (int i = 0; i< a.length-1;i++) {
             if (a[i] > a[i+1]){
-                System.out.println("FEIL på plass: "+
-                        i +" a["+i+"]:"+a[i]+" > a["+(i+1)+"]:"+a[i+1]);
+                System.out.println("FEIL på plass: a["+i+"]:"+a[i]+" > a["+(i+1)+"]:"+a[i+1]);
                 return;
             }
         }
