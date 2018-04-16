@@ -1,8 +1,11 @@
 import java.util.Arrays;
 import java.util.Random;
+import java.util.concurrent.BrokenBarrierException;
+import java.util.concurrent.CyclicBarrier;
 
 public class MultiRadix {
 
+    // STATIC VARS
     private static int n;
     private static int k;
 
@@ -12,6 +15,11 @@ public class MultiRadix {
     private static final int medianIndex = 4;
     private static double[] seqTiming = new double[runs];
     private static double[] parTiming = new double[runs];
+
+    // INSTANCE VARS
+    private RadixWorker[] workers;
+    private int numBit = 1;
+    private int[] bit, globalCount;
 
     /**
      * Main.
@@ -28,7 +36,6 @@ public class MultiRadix {
 
         for (int i = 0; i < runs; i++) {
             new MultiRadix(i);
-            if (true) return;
         }
 
         Arrays.sort(seqTiming);
@@ -63,9 +70,6 @@ public class MultiRadix {
         seqTiming[run] = (System.nanoTime() - startTime) / 1000000.0;
         System.out.println("Sequential time: " + seqTiming[run] + "ms.");
         testSort(seqArray);
-
-        if (true)
-            return;
 
         // Do parallel tests
         System.out.println("Starting Parallel");
@@ -109,8 +113,8 @@ public class MultiRadix {
             b = t;
         }
 
-        if ((bit.length&1) != 0 ) {
-            System.arraycopy (a,0,b,0,a.length);
+        if ((bit.length & 1) != 0 ) {
+            System.arraycopy(a, 0, b, 0, a.length);
         }
     }
 
@@ -128,7 +132,7 @@ public class MultiRadix {
         int[] count = new int[mask + 1];
 
         for (int anA : a) {
-            count[(anA >> shift) & mask]++;
+            count[(anA >>> shift) & mask]++;
         }
 
         for (int i = 0; i <= mask; i++) {
@@ -138,7 +142,7 @@ public class MultiRadix {
         }
 
         for (int anA : a) {
-            b[count[(anA >> shift) & mask]++] = anA;
+            b[count[(anA >>> shift) & mask]++] = anA;
         }
     }
 
@@ -147,7 +151,178 @@ public class MultiRadix {
      * @param a The array to sort.
      */
     private void par(int[] a) {
-        //
+        Thread[] threads = new Thread[k];
+        workers = new RadixWorker[threads.length];
+        CyclicBarrier cb = new CyclicBarrier(threads.length);
+
+        int[] b = new int[a.length];
+
+        for (int i = 0; i < threads.length; i++) {
+            workers[i] = new RadixWorker(i, a, b, cb);
+            threads[i] = new Thread(workers[i]);
+            threads[i].start();
+        }
+
+        for (Thread t : threads) {
+            try {
+                t.join();
+            } catch (InterruptedException e) {
+                // e.printStackTrace();
+            }
+        }
+    }
+
+    private class RadixWorker implements Runnable {
+        int id;
+        int[] a, b;
+
+        int localMax;
+        int[] localCount;
+
+        CyclicBarrier cb;
+
+        RadixWorker(int id, int[] a, int[] b, CyclicBarrier cb) {
+            this.id = id;
+            this.a = a;
+            this.b = b;
+            this.cb = cb;
+        }
+
+        @Override
+        public void run() {
+            int arrSegmentSize = n / workers.length;
+            int arrStart = arrSegmentSize * id;
+            int arrStop = arrSegmentSize * (id + 1);
+            arrStop = (id == (workers.length - 1)) ? n : arrStop;
+
+            // Find local max.
+            localMax = findMax(a, arrStart, arrStop);
+
+            try {
+                cb.await();
+            } catch (InterruptedException | BrokenBarrierException e) {
+                e.printStackTrace();
+            }
+
+            // Combine max
+            if (id == 0) {
+                int max = localMax, numDigits;
+                for (RadixWorker w : workers) {
+                    if (w.localMax > max) {
+                        max = w.localMax;
+                    }
+                }
+
+                // Sets some global stuff and stuffs numBit.
+                while (max >= (1L<<numBit)) numBit++;
+                numDigits = Math.max(1, numBit / NUM_BIT);
+                bit = new int[numDigits];
+
+                int rest = numBit % NUM_BIT;
+
+                for (int i = 0; i < bit.length; i++){
+                    bit[i] = numBit / numDigits;
+                    if (rest-- > 0) {
+                        bit[i]++;
+                    }
+                }
+            }
+
+            try {
+                cb.await();
+            } catch (InterruptedException | BrokenBarrierException e) {
+                e.printStackTrace();
+            }
+
+            // Do the radix loop
+            int sum = 0, acumVal, tempInt, mask;
+            int digitSegmentSize, digitStart, digitStop;
+            int[] t;
+            for (int aBit : bit) {
+                // seqRadix(a, b, aBit, sum);
+                mask = (1 << aBit) - 1;
+                localCount = new int[mask + 1];
+                acumVal = 0;
+
+                // Count locally their own part of the array.
+                for (int i = arrStart; i < arrStop; i++) {
+                    localCount[(a[i] >>> sum) & mask]++;
+                }
+
+                try {
+                    cb.await();
+                } catch (InterruptedException | BrokenBarrierException e) {
+                    e.printStackTrace();
+                }
+
+                // Combine results and calculate accumulated val.
+                if (id == 0) {
+                    globalCount = new int[localCount.length];
+
+                    // Combine
+                    for (RadixWorker w : workers) {
+                        for (int i = 0; i < globalCount.length; i++) {
+                            globalCount[i] += w.localCount[i];
+                        }
+                    }
+
+                    // Accumulate
+                    for (int i = 0; i <= mask; i++) {
+                        tempInt = globalCount[i];
+                        globalCount[i] = acumVal;
+                        acumVal += tempInt;
+                    }
+                }
+
+                try {
+                    cb.await();
+                } catch (InterruptedException | BrokenBarrierException e) {
+                    e.printStackTrace();
+                }
+
+                // Copy global to local count.
+                // System.arraycopy(localCount, 0, globalCount, 0, localCount.length);
+
+                // Move the numbers over
+                // Giving each thread responsibility for their set of digits, they will only move those.
+                digitSegmentSize = localCount.length / workers.length;
+                digitStart = digitSegmentSize * id;
+                digitStop = digitSegmentSize * (id + 1);
+                digitStop = (id == (workers.length - 1)) ? localCount.length : digitStop;
+
+                for (int i : a) {
+                    tempInt = (i >>> sum) & mask; // Store the digit already masked.
+                    // If in range
+                    if (tempInt > digitStart && tempInt < digitStop) {
+                        b[globalCount[tempInt]++] = i;
+                    }
+                }
+
+                try {
+                    cb.await();
+                } catch (InterruptedException | BrokenBarrierException e) {
+                    e.printStackTrace();
+                }
+
+                sum += aBit;
+
+                // Swap local references
+                t = a;
+                a = b;
+                b = t;
+
+                // Sync before next round.
+                try {
+                    cb.await();
+                } catch (InterruptedException | BrokenBarrierException e) {
+                    e.printStackTrace();
+                }
+            }
+
+            if (id == 0 && (bit.length & 1) != 0) {
+                System.arraycopy(a, 0, b, 0, a.length);
+            }
+        }
     }
 
     /**
