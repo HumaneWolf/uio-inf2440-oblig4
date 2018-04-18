@@ -9,7 +9,7 @@ public class MultiRadix {
     private static int n;
     private static int k;
 
-    private final static int NUM_BIT = 9;
+    private final static int NUM_BIT = 8;
 
     private static final int runs = 7;
     private static final int medianIndex = 4;
