@@ -9,7 +9,7 @@ public class MultiRadix {
     private static int n;
     private static int k;
 
-    private final static int NUM_BIT = 7;
+    private final static int NUM_BIT = 9;
 
     private static final int runs = 7;
     private static final int medianIndex = 4;
@@ -18,7 +18,7 @@ public class MultiRadix {
 
     // INSTANCE VARS
     private RadixWorker[] workers;
-    private int numBit = 1;
+    private int numBit = 2;
     private int[] bit, globalCount;
 
     /**
@@ -90,7 +90,7 @@ public class MultiRadix {
         int numBit = 2, numDigits;
         int[] bit;
 
-        while (max >= (1L<<numBit)) numBit++;
+        while (max >= (1L << numBit)) numBit++;
 
         numDigits = Math.max(1, numBit / NUM_BIT);
         bit = new int[numDigits];
@@ -214,7 +214,7 @@ public class MultiRadix {
                 }
 
                 // Sets some global stuff and stuffs numBit.
-                while (max >= (1L<<numBit)) numBit++;
+                while (max >= (1L << numBit)) numBit++;
                 numDigits = Math.max(1, numBit / NUM_BIT);
                 bit = new int[numDigits];
 
@@ -261,16 +261,9 @@ public class MultiRadix {
 
                     // Combine
                     for (RadixWorker w : workers) {
-                        for (int i = 0; i < globalCount.length; i++) {
+                        for (int i = 0; i <= mask; i++) {
                             globalCount[i] += w.localCount[i];
                         }
-                    }
-
-                    // Accumulate
-                    for (int i = 0; i <= mask; i++) {
-                        tempInt = globalCount[i];
-                        globalCount[i] = acumVal;
-                        acumVal += tempInt;
                     }
                 }
 
@@ -281,7 +274,14 @@ public class MultiRadix {
                 }
 
                 // Copy global to local count.
-                // System.arraycopy(localCount, 0, globalCount, 0, localCount.length);
+                System.arraycopy(localCount, 0, globalCount, 0, localCount.length);
+
+                // Accumulate locally
+                for (int i = 0; i <= mask; i++) {
+                    tempInt = localCount[i];
+                    localCount[i] = acumVal;
+                    acumVal += tempInt;
+                }
 
                 // Move the numbers over
                 // Giving each thread responsibility for their set of digits, they will only move those.
@@ -293,15 +293,9 @@ public class MultiRadix {
                 for (int i : a) {
                     tempInt = (i >>> sum) & mask; // Store the digit already masked.
                     // If in range
-                    if (tempInt > digitStart && tempInt < digitStop) {
+                    if (digitStart < tempInt && tempInt < digitStop) {
                         b[globalCount[tempInt]++] = i;
                     }
-                }
-
-                try {
-                    cb.await();
-                } catch (InterruptedException | BrokenBarrierException e) {
-                    e.printStackTrace();
                 }
 
                 sum += aBit;
