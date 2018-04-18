@@ -239,7 +239,7 @@ public class MultiRadix {
             int digitSegmentSize, digitStart, digitStop;
             int[] t;
             for (int aBit : bit) {
-                // seqRadix(a, b, aBit, sum);
+                // seqRadix(a, b, aBit (masklen), sum (shift));
                 mask = (1 << aBit) - 1;
                 localCount = new int[mask + 1];
                 acumVal = 0;
@@ -267,7 +267,7 @@ public class MultiRadix {
                     }
 
                     // Accumulate
-                    for (int i = 0; i <= mask; i++) {
+                    for (int i = 0; i < localCount.length; i++) {
                         tempInt = globalCount[i];
                         globalCount[i] = acumVal;
                         acumVal += tempInt;
@@ -293,7 +293,7 @@ public class MultiRadix {
                 for (int i : a) {
                     tempInt = (i >>> sum) & mask; // Store the digit already masked.
                     // If in range
-                    if (tempInt > digitStart && tempInt < digitStop) {
+                    if (digitStart < tempInt && tempInt < digitStop) {
                         b[globalCount[tempInt]++] = i;
                     }
                 }
