@@ -54,12 +54,9 @@ public class MultiRadix {
      * @param run The run id number.
      */
     private MultiRadix(int run) {
-        int[] a = new int[n];
         Random rng = new Random();
+        int[] a = Oblig4Precode.generateArray(n, rng.nextInt());
 
-        for (int i = 0; i < a.length; i++) {
-            a[i] = rng.nextInt(n);
-        }
         int[] seqArray = a.clone();
         int[] parArray = a.clone();
 
@@ -78,6 +75,8 @@ public class MultiRadix {
         parTiming[run] = (System.nanoTime() - startTime) / 1000000.0;
         System.out.println("Parallel time: " + parTiming[run] + "ms.");
         testSort(parArray);
+
+        Oblig4Precode.printResults("krishto", parArray);
     }
 
     /**
@@ -220,7 +219,7 @@ public class MultiRadix {
 
                 int rest = numBit % NUM_BIT;
 
-                for (int i = 0; i < bit.length; i++){
+                for (int i = 0; i < numDigits; i++){
                     bit[i] = numBit / numDigits;
                     if (rest-- > 0) {
                         bit[i]++;
@@ -239,7 +238,7 @@ public class MultiRadix {
             int digitSegmentSize, digitStart, digitStop;
             int[] t;
             for (int aBit : bit) {
-                // seqRadix(a, b, aBit, sum);
+                // seqRadix(a, b, aBit (masklen), sum (shift));
                 mask = (1 << aBit) - 1;
                 localCount = new int[mask + 1];
                 acumVal = 0;
@@ -255,7 +254,7 @@ public class MultiRadix {
                     e.printStackTrace();
                 }
 
-                // Combine results and calculate accumulated val.
+                // Combine results
                 if (id == 0) {
                     globalCount = new int[localCount.length];
 
@@ -274,7 +273,7 @@ public class MultiRadix {
                 }
 
                 // Copy global to local count.
-                System.arraycopy(localCount, 0, globalCount, 0, localCount.length);
+                System.arraycopy(globalCount, 0, localCount, 0, localCount.length);
 
                 // Accumulate locally
                 for (int i = 0; i <= mask; i++) {
@@ -293,8 +292,8 @@ public class MultiRadix {
                 for (int i : a) {
                     tempInt = (i >>> sum) & mask; // Store the digit already masked.
                     // If in range
-                    if (digitStart < tempInt && tempInt < digitStop) {
-                        b[globalCount[tempInt]++] = i;
+                    if (digitStart <= tempInt && tempInt < digitStop) {
+                        b[localCount[tempInt]++] = i;
                     }
                 }
 
@@ -305,7 +304,7 @@ public class MultiRadix {
                 a = b;
                 b = t;
 
-                // Sync before next round.
+                // Sync before next round / before copying over from b to a if necessary.
                 try {
                     cb.await();
                 } catch (InterruptedException | BrokenBarrierException e) {
@@ -313,7 +312,7 @@ public class MultiRadix {
                 }
             }
 
-            if (id == 0 && (bit.length & 1) != 0) {
+            if (id == 0 && ((bit.length & 1) != 0)) {
                 System.arraycopy(a, 0, b, 0, a.length);
             }
         }
